@@ -1,0 +1,11 @@
+build/
+CMakeUserPresets.json
+compile_commands.json
+.cache/
+*.o
+*.a
+*.so
+*.swp
+*.swo
+*~
+.DS_Store
