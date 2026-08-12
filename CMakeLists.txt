@@ -1,25 +1,22 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(slipstream
-    VERSION 0.1.0
-    LANGUAGES CXX)
+project(slipstream VERSION 0.1.0 LANGUAGES CXX)
 
-add_executable(slipstream
-    src/main.cpp)
+# Defaults for every target below.
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)   # fail loudly instead of falling back to C++17
+set(CMAKE_CXX_EXTENSIONS OFF)         # -std=c++23, not -std=gnu++23
+add_compile_options(-Wall -Wextra -Wpedantic)
 
-# The language standard is a property of this target, so it only ever reaches
-# this project's compile commands. Nothing here is installed, exported, or
-# written outside the build tree -- other projects on this machine keep
-# whatever standard they already ask for.
-#
-# cxx_std_23 is a hard requirement, not a preference: if the compiler CMake
-# picks cannot do C++23, configuration fails here rather than silently falling
-# back to an older standard and failing later on a feature that is missing.
-target_compile_features(slipstream PRIVATE cxx_std_23)
+# A forgotten case in a switch over MessageType is a bug, not a warning.
+add_compile_options(-Werror=switch)
 
-# -std=c++23 rather than -std=gnu++23, so GNU extensions do not quietly become
-# load-bearing and pin the project to one compiler.
-set_target_properties(slipstream PROPERTIES CXX_EXTENSIONS OFF)
+# std::span is unchecked; this aborts on out-of-range access in Debug.
+add_compile_definitions($<$<CONFIG:Debug>:_GLIBCXX_ASSERTIONS>)
 
-target_compile_options(slipstream PRIVATE
-    -Wall -Wextra -Wpedantic)
+add_subdirectory(src)
+add_subdirectory(apps/market_data)
+add_subdirectory(apps/order_entry)
+
+enable_testing()
+add_subdirectory(tests)
