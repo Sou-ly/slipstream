@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
+#include <string_view>
 
 namespace slipstream {
 
@@ -53,7 +54,8 @@ concept WireLayout =
 /// A payload, which also carries the type tag encode stamps into the header.
 template<class T>
 concept WireMessage = WireLayout<T> &&
-    std::same_as<decltype(T::type), const MessageType>;
+    std::same_as<decltype(T::type), const MessageType> &&
+	std::same_as<decltype(T::name), const std::string_view>;
 
 struct WireHeader {
 	le_u16			body_len;	// payload bytes following this header
@@ -72,6 +74,7 @@ struct WireFrame {
 
 struct QuoteMessage {
     static constexpr auto type = MessageType::Quote;
+	static constexpr std::string_view name = "Quote";
 	char		symbol[12]; // ASCII, null-padded, not null-terminated if full
 	le_u64		ts_ns;		// nanoseconds since UNIX epoch
 	le_u32		bid_qty;
@@ -84,6 +87,7 @@ static_assert(sizeof(QuoteMessage) == 44);
 
 struct TradeMessage {
     static constexpr auto type = MessageType::Trade;
+	static constexpr std::string_view name = "Trade";
     enum class AggressorType : char {
     	Buy		= 'B',
     	Sell	= 'S',
@@ -101,6 +105,7 @@ static_assert(sizeof(TradeMessage) == 41);
 
 struct HeartbeatMessage {
     static constexpr auto type = MessageType::Heartbeat;
+    static constexpr std::string_view name = "Heartbeat";
 	le_u64 ts_ns;
 };
 static_assert(WireMessage<HeartbeatMessage>);
@@ -108,6 +113,7 @@ static_assert(sizeof(HeartbeatMessage) == 8);
 
 struct SessionControlMessage {
     static constexpr auto type = MessageType::SessionControl;
+	static constexpr std::string_view name = "SessionControl";
     enum class SessionState : std::uint8_t {
     	Open = 0,
     	Halt = 1,
@@ -121,6 +127,7 @@ static_assert(sizeof(SessionControlMessage) == 9);
 
 struct NewOrderMessage {
     static constexpr auto type = MessageType::NewOrder;
+	static constexpr std::string_view name = "NewOrder";
     enum class Status   : char { Accepted = 'A', Refused = 'R' };
     enum class Side     : char { Buy = 'B', Sell = 'S' };
     le_u64      client_order_id;
@@ -137,6 +144,7 @@ static_assert(sizeof(NewOrderMessage) == 50);
 
 struct ExecReportMessage {
     static constexpr auto type = MessageType::ExecReport;
+	static constexpr std::string_view name = "ExecReport";
     enum class Status : std::uint8_t {
         Ack     = 1,
         Fill    = 2,
