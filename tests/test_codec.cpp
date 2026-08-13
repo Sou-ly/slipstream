@@ -174,7 +174,7 @@ void test_encode_rejects_small_buffer() {
 
 	const auto failed = encode(sample_quote(), one_short);
 	CHECK(!failed.has_value());
-	CHECK(failed.error() == EncodeError::BufferTooSmall);
+	CHECK(failed.error() == EncodeError::BufferSize);
 }
 
 void test_encode_does_not_overrun() {

@@ -7,35 +7,7 @@
 #include <string_view>
 
 #include <slipstream/codec/encode.hpp>
-
-namespace {
-enum class HeaderType : std::uint8_t {
-	Timestamp	= 0,
-	Type		= 1,
-	Symbol		= 2,
-	BidPrice	= 3,
-	BidQty		= 4,
-	AskPrice	= 5,
-	AskQty		= 6,
-	Price		= 7,
-	Qty			= 8
-};
-
-inline constexpr std::array allHeaderTypes = { HeaderType::Timestamp, HeaderType::Type,
-	HeaderType::Symbol, HeaderType::BidPrice, HeaderType::BidQty, HeaderType::AskPrice,
-	HeaderType::AskQty, HeaderType::Price, HeaderType::Qty };
-
-inline constexpr std::array allHeaderNames = { "Timestamp", "Type", "Symbol", "BidPrice",
-	"BidQty", "AskPrice", "AskQty", "Price", "Qty" };
-
-static_assert(allHeaderNames.size() == allHeaderTypes.size());
-
-using Row = std::array<std::string, allHeaderTypes.size()>;
-
-void printHelpMessage(std::string_view name) {
-	std::cout << "Usage: " << name << " --file <filename>" << std::endl;
-}
-}
+#include <slipstream/replay/csv.hpp>
 
 int main(int argc, char* argv[]) {
 	std::string filename;
