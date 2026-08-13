@@ -1,11 +1,13 @@
 #pragma once
 
 #include "message.hpp"
+#include <slipstream/error/error.hpp>
 
 #include <cstddef>
 #include <cstring>
 #include <expected>
 #include <span>
+#include <string_view>
 #include <variant>
 
 namespace slipstream {
@@ -18,6 +20,20 @@ enum class DecodeError : std::uint8_t {
 	MessageTooLarge		= 4,
 	InvalidField		= 5,
 };
+
+// No default: -Werror=switch catches an enumerator added without a message.
+constexpr std::string_view describe(DecodeError error) noexcept {
+	switch (error) {
+		case DecodeError::Incomplete:			return "incomplete frame, more bytes needed";
+		case DecodeError::UnknownMessageType:	return "unknown message type";
+		case DecodeError::UnsupportedVersion:	return "unsupported protocol version";
+		case DecodeError::LengthMismatch:		return "body_len disagrees with the message type";
+		case DecodeError::MessageTooLarge:		return "body_len exceeds the largest known message";
+		case DecodeError::InvalidField:			return "field outside its valid range";
+	}
+	return "unknown decode error";
+}
+static_assert(DescribableError<DecodeError>);
 
 /// True when the stream is desynchronised and the connection must be dropped.
 constexpr bool is_fatal(DecodeError error) noexcept {

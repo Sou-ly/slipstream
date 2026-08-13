@@ -51,11 +51,24 @@ concept WireLayout =
     std::is_standard_layout_v<T> &&
     alignof(T) == 1;
 
+/// Which wire protocol a message belongs to.
+enum class Protocol : std::uint8_t {
+	Market	= 0,
+	Order	= 1,
+};
+
 /// A payload, which also carries the type tag encode stamps into the header.
 template<class T>
 concept WireMessage = WireLayout<T> &&
     std::same_as<decltype(T::type), const MessageType> &&
-	std::same_as<decltype(T::name), const std::string_view>;
+	std::same_as<decltype(T::name), const std::string_view> &&
+	std::same_as<decltype(T::protocol), const Protocol>;
+
+template<class T>
+concept MarketMessage = WireMessage<T> && T::protocol == Protocol::Market;
+
+template<class T>
+concept OrderMessage = WireMessage<T> && T::protocol == Protocol::Order;
 
 struct WireHeader {
 	le_u16			body_len;	// payload bytes following this header
@@ -75,6 +88,7 @@ struct WireFrame {
 struct QuoteMessage {
     static constexpr auto type = MessageType::Quote;
 	static constexpr std::string_view name = "Quote";
+	static constexpr Protocol protocol = Protocol::Market;
 	char		symbol[12]; // ASCII, null-padded, not null-terminated if full
 	le_u64		ts_ns;		// nanoseconds since UNIX epoch
 	le_u32		bid_qty;
@@ -88,6 +102,7 @@ static_assert(sizeof(QuoteMessage) == 44);
 struct TradeMessage {
     static constexpr auto type = MessageType::Trade;
 	static constexpr std::string_view name = "Trade";
+	static constexpr Protocol protocol = Protocol::Market;
     enum class AggressorType : char {
     	Buy		= 'B',
     	Sell	= 'S',
@@ -106,6 +121,7 @@ static_assert(sizeof(TradeMessage) == 41);
 struct HeartbeatMessage {
     static constexpr auto type = MessageType::Heartbeat;
     static constexpr std::string_view name = "Heartbeat";
+	static constexpr Protocol protocol = Protocol::Market;
 	le_u64 ts_ns;
 };
 static_assert(WireMessage<HeartbeatMessage>);
@@ -114,6 +130,7 @@ static_assert(sizeof(HeartbeatMessage) == 8);
 struct SessionControlMessage {
     static constexpr auto type = MessageType::SessionControl;
 	static constexpr std::string_view name = "SessionControl";
+	static constexpr Protocol protocol = Protocol::Market;
     enum class SessionState : std::uint8_t {
     	Open = 0,
     	Halt = 1,
@@ -128,6 +145,7 @@ static_assert(sizeof(SessionControlMessage) == 9);
 struct NewOrderMessage {
     static constexpr auto type = MessageType::NewOrder;
 	static constexpr std::string_view name = "NewOrder";
+	static constexpr Protocol protocol = Protocol::Order;
     enum class Status   : char { Accepted = 'A', Refused = 'R' };
     enum class Side     : char { Buy = 'B', Sell = 'S' };
     le_u64      client_order_id;
@@ -145,6 +163,7 @@ static_assert(sizeof(NewOrderMessage) == 50);
 struct ExecReportMessage {
     static constexpr auto type = MessageType::ExecReport;
 	static constexpr std::string_view name = "ExecReport";
+	static constexpr Protocol protocol = Protocol::Order;
     enum class Status : std::uint8_t {
         Ack     = 1,
         Fill    = 2,
@@ -168,6 +187,13 @@ struct ExecReportMessage {
 };
 static_assert(WireMessage<ExecReportMessage>);
 static_assert(sizeof(ExecReportMessage) == 30);
+
+static_assert(MarketMessage<QuoteMessage>);
+static_assert(MarketMessage<TradeMessage>);
+static_assert(OrderMessage<NewOrderMessage>);
+static_assert(OrderMessage<ExecReportMessage>);
+static_assert(MarketMessage<HeartbeatMessage>);
+static_assert(MarketMessage<SessionControlMessage>);
 
 /// Largest payload, so a decoder can reject an absurd body_len up front.
 inline constexpr std::size_t max_body_len = std::max({
