@@ -66,9 +66,9 @@ The tests cover the parts that are easy to get wrong and hard to notice: prices
 converted without rounding, timestamps, messages arriving in pieces of any size,
 and malformed input being rejected instead of crashing.
 
-## The CSV file
+## Resources
 
-`data/Quotes_and_Trades.csv` holds about an hour of made up market data for five
+`data/Quotes_and_Trades.csv` holds about an hour of market data for five
 symbols. Lines starting with `#` are comments. Every row has the same nine
 columns, and the `Type` column says which kind of row it is:
 
