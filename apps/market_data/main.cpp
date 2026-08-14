@@ -1,21 +1,53 @@
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
+#include <algorithm>
 #include <array>
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <thread>
 
 #include <slipstream/codec/encode.hpp>
 #include <slipstream/replay/csv.hpp>
 
+using namespace slipstream;
+
+namespace {
+
+void printHelpMessage(std::string_view name) {
+	std::cerr << "Usage: " << name << " --file <path> [--symbol <sym>] [--speed <x>]\n"
+	          << "  --speed 1   real time (default)\n"
+	          << "  --speed 0   as fast as possible\n"
+	          << "Frames go to stdout, diagnostics to stderr.\n";
+}
+
+} // namespace
+
 int main(int argc, char* argv[]) {
 	std::string filename;
+	std::string symbol;
+	double speed = 1.0;
 
 	for (int i = 1; i < argc; ++i) {
 		std::string_view arg(argv[i]);
 		if ((arg == "-f" || arg == "--file") && i + 1 < argc) {
 			filename = argv[++i];
+		} else if (arg == "--symbol" && i + 1 < argc) {
+			symbol = argv[++i];
+			if (symbol.size() > 12) {
+				std::cerr << "Symbol must be 12 characters or less." << std::endl;
+				return 1;
+			}
+		} else if (arg == "--speed" && i + 1 < argc) {
+			speed = std::stod(argv[++i]);
+			// Written this way so NaN is rejected too.
+			if (!(speed >= 0.0)) {
+				std::cerr << "Speed must be zero or positive." << std::endl;
+				return 1;
+			}
 		} else if (arg == "-h" || arg == "--help") {
 			printHelpMessage(argv[0]);
 			return 0;
@@ -33,67 +65,59 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	std::string line;
-	std::size_t lineNumber = 0;
-	bool headerSeen = false;
-	std::vector<Row> csv;
-
-	while (std::getline(inf, line)) {
-		++lineNumber;
-
-		if (!line.empty() && line.back() == '\r') {
-			line.pop_back();
-		}
-		if (line.empty() || line[0] == '#') {
-			continue;
-		}
-
-		Row row;
-		std::size_t fields = 0;
-		std::size_t start = 0;
-
-		while (true) {
-			const std::size_t comma = line.find(',', start);
-			const std::size_t end = (comma == std::string::npos) ? line.size() : comma;
-			if (fields == row.size()) {
-				++fields;
-				break;
-			}
-			row[fields++] = line.substr(start, end - start);
-			if (comma == std::string::npos) {
-				break;
-			}
-			start = comma + 1;
-		}
-
-		if (fields != row.size()) {
-			std::cerr << filename << ":" << lineNumber << ": expected "
-			          << row.size() << " fields" << std::endl;
-			return 1;
-		}
-
-		if (!headerSeen) {
-			headerSeen = true;
-			for (std::size_t i = 0; i < row.size(); ++i) {
-				if (row[i] != allHeaderNames[i]) {
-					std::cerr << filename << ":" << lineNumber << ": expected column "
-					          << i << " to be " << allHeaderNames[i]
-					          << ", got " << row[i] << std::endl;
-					return 1;
-				}
-			}
-			continue;
-		}
-
-		csv.push_back(std::move(row));
-	}
-
-	if (!headerSeen) {
-		std::cerr << filename << ": no header row" << std::endl;
+	const auto all_quotes = csv::tryParse<QuoteMessage>(inf);
+	if (!all_quotes) {
+		std::cerr << "Error parsing " << filename << ": " << describe(all_quotes.error()) << std::endl;
 		return 1;
 	}
 
-	std::cout << "parsed " << csv.size() << " rows from " << filename << std::endl;
+	const auto start = std::chrono::steady_clock::now();
+	std::optional<std::uint64_t> first_ts;
+	std::size_t sent = 0;
+	std::size_t late = 0;
+	std::chrono::nanoseconds worst_lateness{};
 
+	for (const auto& quote : *all_quotes) {
+		if (!symbol.empty() && symbol_view(quote.symbol) != symbol) continue;
+
+		const std::uint64_t ts = quote.ts_ns;
+		if (!first_ts) first_ts = ts;
+
+		if (speed > 0.0) {
+			// Deadlines are absolute from `start`, so an overshoot never accumulates.
+			const auto offset = std::chrono::nanoseconds{
+				static_cast<std::int64_t>(static_cast<double>(ts - *first_ts) / speed)};
+			const auto deadline = start + offset;
+			std::this_thread::sleep_until(deadline);
+
+			const auto lateness = std::chrono::steady_clock::now() - deadline;
+			if (lateness > std::chrono::milliseconds{1}) {
+				++late;
+				worst_lateness = std::max(worst_lateness,
+					std::chrono::duration_cast<std::chrono::nanoseconds>(lateness));
+			}
+		}
+
+		std::array<std::byte, 256> frame{};
+		const auto written = encode(quote, frame);
+		if (!written) {
+			std::cerr << "Encode failed: " << describe(written.error()) << std::endl;
+			return 1;
+		}
+
+		std::cout.write(reinterpret_cast<const char*>(frame.data()),
+		                static_cast<std::streamsize>(*written));
+		std::cout.flush();
+		++sent;
+	}
+
+	std::cout.flush();
+	std::cerr << "sent " << sent << " quotes";
+	if (late > 0) {
+		std::cerr << ", " << late << " late (worst "
+		          << std::chrono::duration_cast<std::chrono::milliseconds>(worst_lateness).count()
+		          << " ms)";
+	}
+	std::cerr << std::endl;
 	return 0;
 }

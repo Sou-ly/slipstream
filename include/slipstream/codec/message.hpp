@@ -195,6 +195,13 @@ static_assert(OrderMessage<ExecReportMessage>);
 static_assert(MarketMessage<HeartbeatMessage>);
 static_assert(MarketMessage<SessionControlMessage>);
 
+/// A NUL-padded wire symbol as text. A full 12-character symbol has no terminator.
+constexpr std::string_view symbol_view(const char (&symbol)[12]) noexcept {
+	std::size_t length = 0;
+	while (length < 12 && symbol[length] != '\0') ++length;
+	return std::string_view{symbol, length};
+}
+
 /// Largest payload, so a decoder can reject an absurd body_len up front.
 inline constexpr std::size_t max_body_len = std::max({
 	sizeof(QuoteMessage),			sizeof(TradeMessage),		sizeof(HeartbeatMessage),
