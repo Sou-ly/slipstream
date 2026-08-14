@@ -1,6 +1,7 @@
 # A library so apps and tests share one build, and the headers' asserts actually run.
 add_library(slipstream_codec
-    codec/decode.cpp)
+    codec/decode.cpp
+	codec/reader.cpp)
 add_library(slipstream::codec ALIAS slipstream_codec)
 
 # PUBLIC: consumers include <slipstream/codec/...>, so the path propagates.

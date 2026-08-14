@@ -13,7 +13,7 @@
 namespace slipstream {
 
 enum class DecodeError : std::uint8_t {
-	Incomplete			= 0,	// not a failure: call again with more bytes
+	Incomplete			= 0,
 	UnknownMessageType	= 1,
 	UnsupportedVersion	= 2,
 	LengthMismatch		= 3,

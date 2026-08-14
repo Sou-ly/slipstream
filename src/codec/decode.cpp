@@ -10,21 +10,22 @@ std::expected<Decoded, DecodeError> try_decode(std::span<const std::byte> in) no
 	WireHeader header{};
 	std::memcpy(&header, in.data(), sizeof(WireHeader));
 
-	if (!is_supported_version(header.version)) {
-		return std::unexpected(DecodeError::UnsupportedVersion);
-	}
-	// Checked as a raw byte, before anything switches on the enum.
-	if (!is_valid_message_type(static_cast<std::uint8_t>(header.msg_type))) {
-		return std::unexpected(DecodeError::UnknownMessageType);
-	}
-
 	const std::size_t body_len = header.body_len;
 	if (body_len > max_body_len) {
 		return std::unexpected(DecodeError::MessageTooLarge);
 	}
-	// Subtraction, so an attacker-controlled length cannot overflow past the check.
+
 	if (in.size() - sizeof(WireHeader) < body_len) {
 		return std::unexpected(DecodeError::Incomplete);
+	}
+
+	if (!is_supported_version(header.version)) {
+		return std::unexpected(DecodeError::UnsupportedVersion);
+	}
+
+	// Checked as a raw byte, before anything switches on the enum.
+	if (!is_valid_message_type(static_cast<std::uint8_t>(header.msg_type))) {
+		return std::unexpected(DecodeError::UnknownMessageType);
 	}
 
 	const std::span<const std::byte> body = in.subspan(sizeof(WireHeader));
