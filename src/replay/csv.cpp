@@ -125,9 +125,20 @@ std::expected<void, ParseError> parseSymbol(std::string_view text, char (&out)[1
 	return {};
 }
 
+std::expected<TradeMessage::AggressorType, ParseError> parseAggressor(std::string_view text) noexcept {
+	if (text.size() > 1) return std::unexpected(ParseError::BadAggressor);
+	if (text.size() == 0 || text[0] == '?') return TradeMessage::AggressorType::Unknown;
+	if (text[0] == 'B') return TradeMessage::AggressorType::Buy;
+	if (text[0] == 'S') return TradeMessage::AggressorType::Sell;
+	return std::unexpected(ParseError::BadAggressor);
+}
+
 template<>
 std::expected<QuoteMessage, ParseError> fromRow<QuoteMessage>(const Fields& fields) noexcept {
-	if (!field(fields, Column::Price).empty() || !field(fields, Column::Qty).empty()) {
+	if (!field(fields, Column::Price).empty()
+		|| !field(fields, Column::Qty).empty()
+		|| !field(fields, Column::Aggressor).empty())
+	{
 		return std::unexpected(ParseError::UnexpectedField);
 	}
 
@@ -156,12 +167,16 @@ std::expected<QuoteMessage, ParseError> fromRow<QuoteMessage>(const Fields& fiel
 }
 
 template<>
-std::expected<NewOrderMessage, ParseError> fromRow<NewOrderMessage>(const Fields& fields) noexcept {
-	if (!field(fields, Column::BidPrice).empty() || !field(fields, Column::AskPrice).empty()) {
+std::expected<TradeMessage, ParseError> fromRow<TradeMessage>(const Fields& fields) noexcept {
+	if (!field(fields, Column::BidPrice).empty()
+		|| !field(fields, Column::AskPrice).empty()
+		|| !field(fields, Column::BidQty).empty()
+		|| !field(fields, Column::AskQty).empty())
+	{
 		return std::unexpected(ParseError::UnexpectedField);
 	}
 
-	NewOrderMessage message{};
+	TradeMessage message{};
 	if (const auto ok = parseSymbol(field(fields, Column::Symbol), message.symbol); !ok) {
 		return std::unexpected(ok.error());
 	}
@@ -172,15 +187,14 @@ std::expected<NewOrderMessage, ParseError> fromRow<NewOrderMessage>(const Fields
 	if (!price) return std::unexpected(price.error());
 	const auto quantity = parseQuantity(field(fields, Column::Qty));
 	if (!quantity) return std::unexpected(quantity.error());
+	const auto aggressor = parseAggressor(field(fields, Column::Aggressor));
+	if (!aggressor) return std::unexpected(aggressor.error());
 
-	message.ts_ns = *timestamp;
-	message.limit = *price;
-	message.qty   = *quantity;
-	// The file carries no aggressor, and ids belong to the sender, not the row.
-	message.side            = NewOrderMessage::Side::Buy;
-	message.status          = NewOrderMessage::Status::Accepted;
-	message.client_order_id = 0;
-	message.trade_id        = 0;
+	message.ts_ns 		= *timestamp;
+	message.qty   		= *quantity;
+	message.px 			= *price;
+	message.aggressor 	= *aggressor;
+	// ids belong to the sender, not the row.
 	return message;
 }
 

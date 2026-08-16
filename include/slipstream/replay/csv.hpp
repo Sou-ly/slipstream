@@ -24,6 +24,7 @@ enum class ParseError : std::uint8_t {
 	BadQuantity			= 6,
 	BadSymbol			= 7,
 	UnexpectedField		= 8,
+	BadAggressor		= 9,
 };
 
 // No default: -Werror=switch catches an enumerator added without a message.
@@ -38,6 +39,7 @@ constexpr std::string_view describe(ParseError error) noexcept {
 		case ParseError::BadQuantity:		return "malformed quantity";
 		case ParseError::BadSymbol:			return "malformed symbol";
 		case ParseError::UnexpectedField:	return "field set for the wrong row type";
+		case ParseError::BadAggressor:		return "malformed aggressor";
 	}
 	return "unknown parse error";
 }
@@ -53,12 +55,13 @@ enum class Column : std::size_t {
 	AskQty		= 6,
 	Price		= 7,
 	Qty			= 8,
+	Aggressor	= 9,
 };
 
-inline constexpr std::size_t column_count = 9;
+inline constexpr std::size_t column_count = 10;
 
 inline constexpr std::array<std::string_view, column_count> column_names {
-	"Timestamp", "Type", "Symbol", "BidPrice", "BidQty", "AskPrice", "AskQty", "Price", "Qty",
+	"Timestamp", "Type", "Symbol", "BidPrice", "BidQty", "AskPrice", "AskQty", "Price", "Qty", "Aggressor"
 };
 
 /// Views into the caller's line buffer, valid only while that line is alive.
@@ -76,18 +79,19 @@ std::expected<std::uint64_t, ParseError> parseTimestamp(std::string_view text) n
 /// Decimal to fixed point, scaled by price_scale, without going through a double.
 std::expected<std::int64_t, ParseError> parsePrice(std::string_view text) noexcept;
 std::expected<std::uint32_t, ParseError> parseQuantity(std::string_view text) noexcept;
+std::expected<TradeMessage::AggressorType, ParseError> parseAggressor(std::string_view text) noexcept;
 std::expected<void, ParseError> parseSymbol(std::string_view text, char (&out)[12]) noexcept;
 
 /// The CSV Type column that produces this message. Specialised only where one exists.
 template<WireMessage Message> constexpr char csvRowCode();
 template<> constexpr char csvRowCode<QuoteMessage>()    { return 'Q'; }
-template<> constexpr char csvRowCode<NewOrderMessage>() { return 'T'; }
+template<> constexpr char csvRowCode<TradeMessage>() { return 'T'; }
 
 template<WireMessage Message>
 std::expected<Message, ParseError> fromRow(const Fields& fields) noexcept;
 
 template<> std::expected<QuoteMessage, ParseError>    fromRow<QuoteMessage>(const Fields&) noexcept;
-template<> std::expected<NewOrderMessage, ParseError> fromRow<NewOrderMessage>(const Fields&) noexcept;
+template<> std::expected<TradeMessage, ParseError> fromRow<TradeMessage>(const Fields&) noexcept;
 
 /// Reads every row whose Type column matches csvRowCode<Message>().
 template<WireMessage Message>
