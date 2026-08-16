@@ -1,7 +1,3 @@
-// Unit tests for FrameReader. CHECK, not assert: survives NDEBUG, reports every failure.
-// The invariant under test: the same byte stream yields the same messages no matter
-// how it is split across read() calls.
-
 #include "slipstream/codec/encode.hpp"
 #include "slipstream/codec/reader.hpp"
 

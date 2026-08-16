@@ -1,5 +1,3 @@
-// Unit tests for libslipstream_codec. CHECK, not assert: survives NDEBUG, reports every failure.
-
 #include "slipstream/codec/decode.hpp"
 #include "slipstream/codec/encode.hpp"
 

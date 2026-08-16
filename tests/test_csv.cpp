@@ -1,5 +1,3 @@
-// Unit tests for the CSV reader. CHECK, not assert: survives NDEBUG, reports every failure.
-
 #include "slipstream/replay/csv.hpp"
 
 #include <print>
