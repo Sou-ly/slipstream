@@ -53,9 +53,6 @@ Options:
 Messages go to standard output as raw bytes. Anything the program wants to tell
 you goes to standard error, so redirecting the output never mixes the two.
 
-`order_entry` is not finished yet. It will replay the trade rows as orders and
-read the replies back.
-
 ## Tests
 
 ```sh
